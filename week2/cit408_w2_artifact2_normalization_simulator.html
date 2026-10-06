@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Invoice Normalization Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a four-round sequence, one round visible at a time, score strip pinned under the header */
+:root{
+  --paper:#F7F3EE; --surface:#FFFFFF; --ink:#171310; --muted:#6B5F57; --line:#DED8D2;
+  --maroon:#990000; --accent:#C00000; --soft:#FBF9F7;
+  --ok:#1F7A45; --ok-bg:#E3F3E9; --bad:#B42318; --bad-bg:#FDECEA; --warn-bg:#FFF4D6;
+  --pick:#F6DADA;
+  --f-display:'Questrial','Century Gothic',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --ok:#7FD6A0; --ok-bg:#16301F; --bad:#FF8A80; --bad-bg:#3A1716; --warn-bg:#3A3015; --pick:#4A1F1F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --ok:#7FD6A0; --ok-bg:#16301F; --bad:#FF8A80; --bad-bg:#3A1716; --warn-bg:#3A3015; --pick:#4A1F1F; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-display);font-size:15px;line-height:1.55;margin:0}
+header.top{background:var(--maroon);color:#fff;padding:16px 20px}
+header.top .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.9}
+header.top h1{margin:2px 0 0;font-size:24px;font-weight:400;text-wrap:balance}
+header.top p{margin:6px 0 0;font-size:14px;opacity:.92;max-width:72ch}
+.strip{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.strip .in{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.steps{display:flex;gap:6px;flex:1;min-width:0;flex-wrap:wrap}
+.steps span{font-size:12px;padding:4px 10px;border:1px solid var(--line);color:var(--muted)}
+.steps span.on{border-color:var(--accent);color:var(--accent)}
+.steps span.done{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.score{font-variant-numeric:tabular-nums;font-size:14px}
+.score b{font-size:20px;color:var(--accent)}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+.round h2{font-size:22px;font-weight:400;margin:0 0 4px;text-wrap:balance}
+.round .lead{color:var(--muted);margin:0 0 14px;max-width:72ch}
+.card{background:var(--surface);border:1px solid var(--line);padding:14px 16px;margin:0 0 16px;min-width:0}
+.card h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:400}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-family:var(--f-mono);font-size:12px;width:100%}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+th{font-weight:600;font-size:11px}
+th button{font:inherit;background:none;border:1px dashed transparent;color:inherit;cursor:pointer;padding:2px 4px}
+th button:hover{border-color:var(--accent)}
+th.sel{background:var(--pick)}
+td.wrapcell{white-space:normal;min-width:240px}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;gap:10px;align-items:center;border:1px solid var(--line);padding:10px 12px;cursor:pointer;background:var(--surface)}
+.opt input{accent-color:var(--accent)}
+.opt.ok{border-color:var(--ok);background:var(--ok-bg)}
+.opt.bad{border-color:var(--bad);background:var(--bad-bg)}
+.fb{margin-top:10px;padding:10px 12px;border-left:4px solid var(--line);background:var(--soft);font-size:14px}
+.fb.ok{border-color:var(--ok)} .fb.bad{border-color:var(--bad)}
+.fb:empty{display:none}
+.deps{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.dep{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px;align-items:center;border:1px solid var(--line);padding:8px 10px;background:var(--surface)}
+.dep .col{font-family:var(--f-mono);font-size:13px}
+.dep .col small{display:block;font-family:var(--f-display);color:var(--muted);font-size:12px}
+.dep select{font:inherit;padding:7px 8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);width:100%}
+.dep.ok{border-color:var(--ok);background:var(--ok-bg)}
+.dep.bad{border-color:var(--bad);background:var(--bad-bg)}
+.dep .why{grid-column:1/-1;font-size:13px}
+.dep .why:empty{display:none}
+@media (max-width:600px){.dep{grid-template-columns:minmax(0,1fr)}}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btn{font:inherit;cursor:pointer;background:var(--maroon);color:#fff;border:0;padding:10px 18px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,select:focus-visible,input:focus-visible,.opt:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+.schemas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.tbl{border:1px solid var(--line);background:var(--surface);margin-bottom:10px}
+.tbl .h{display:flex;justify-content:space-between;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:13px;flex-wrap:wrap}
+.tbl .h .tag{font-family:var(--f-display);font-size:11px;padding:1px 8px;letter-spacing:.06em}
+.tag.ok{background:var(--ok-bg);color:var(--ok)} .tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tbl ul{list-style:none;margin:0;padding:6px 10px}
+.tbl li{font-family:var(--f-mono);font-size:12.5px;padding:2px 0}
+.tbl li .k{color:var(--accent);font-size:11px;margin-left:6px}
+.tbl li.flag{color:var(--bad)}
+.tbl .note{font-size:13px;padding:0 10px 8px;color:var(--bad)}
+.num{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.num input{font:inherit;width:90px;padding:7px 8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-variant-numeric:tabular-nums}
+.final{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.final .stat{border:1px solid var(--line);padding:12px;background:var(--surface)}
+.final .v{font-size:30px;font-variant-numeric:tabular-nums}
+.final .k{font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+code{font-family:var(--f-mono);font-size:12.5px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="kicker">CIT 408 · Module 2 · Activity 2.2</div>
+  <h1>Normalize the warehouse invoices yourself</h1>
+  <p>Coral Bay's warehouse division bills storage and handling services from a flat sheet. You make every decision: find the 1NF problem, pick the key, name each dependency, then see the tables your answers produce and test them for anomalies.</p>
+</header>
+
+<div class="strip"><div class="in">
+  <div class="steps" id="steps">
+    <span data-r="1">1. First normal form</span><span data-r="2">2. Dependencies</span><span data-r="3">3. Your tables</span><span data-r="4">4. Anomaly test</span><span data-r="5">Results</span>
+  </div>
+  <div class="score" aria-live="polite">Score <b id="score">0</b> / 16</div>
+</div></div>
+
+<div class="wrap">
+
+<!-- ROUND 1 -->
+<section class="round" id="r1">
+  <h2>Round 1. Get the sheet into first normal form</h2>
+  <p class="lead">This is the invoice sheet as the billing clerk keeps it, five invoices from March 2026.</p>
+  <div class="card">
+    <h3>Question 1 of 2 · Click the column header that breaks 1NF</h3>
+    <div class="scroll"><table id="unf"></table></div>
+    <div class="fb" id="fb1" aria-live="polite"></div>
+  </div>
+  <div class="card" id="q2card" hidden>
+    <h3>Question 2 of 2 · After splitting the services into rows, what is the primary key?</h3>
+    <div class="scroll"><table id="nf1"></table></div>
+    <div class="opts" id="keyOpts" style="margin-top:12px"></div>
+    <div class="fb" id="fb2" aria-live="polite"></div>
+  </div>
+  <div class="btns"><button class="btn" id="to2" type="button" disabled>Continue to dependencies</button></div>
+</section>
+
+<!-- ROUND 2 -->
+<section class="round" id="r2" hidden>
+  <h2>Round 2. What does each column depend on?</h2>
+  <p class="lead">The key is <code>(invoice_no, service_code)</code>. For every other column, choose what determines its value. If knowing X tells you exactly one value of the column, the column depends on X. Use the 1NF table above if you need to check the data.</p>
+  <div class="card"><div class="deps" id="deps"></div></div>
+  <div class="btns">
+    <button class="btn" id="check2" type="button">Check my answers</button>
+    <button class="btn" id="to3" type="button" disabled>Build my tables</button>
+  </div>
+  <div class="fb" id="fb3" aria-live="polite"></div>
+</section>
+
+<!-- ROUND 3 -->
+<section class="round" id="r3" hidden>
+  <h2>Round 3. The tables your answers produce</h2>
+  <p class="lead">Each column went to the table of the thing it depends on. Your design is on the left; the reference 3NF design is on the right. Red marks a column that still violates a normal form.</p>
+  <div class="schemas">
+    <div class="card"><h3>Your design</h3><div id="mine"></div></div>
+    <div class="card"><h3>Reference 3NF design</h3><div id="ref"></div></div>
+  </div>
+  <div class="fb" id="fb4" aria-live="polite"></div>
+  <div class="btns">
+    <button class="btn ghost" id="back2" type="button">Revise my answers</button>
+    <button class="btn" id="to4" type="button">Continue to the anomaly test</button>
+  </div>
+</section>
+
+<!-- ROUND 4 -->
+<section class="round" id="r4" hidden>
+  <h2>Round 4. Prove normalization was worth it</h2>
+  <p class="lead">Answer from the 1NF table in Round 1 and the reference 3NF design.</p>
+  <div class="card">
+    <h3>Update anomaly · Palmetto Pool Supply (C12) moves from Doral to Homestead</h3>
+    <div class="num"><label for="u1">Rows to change in the 1NF table</label><input id="u1" type="number" min="0" inputmode="numeric"></div>
+    <div class="num"><label for="u2">Rows to change in the 3NF design</label><input id="u2" type="number" min="0" inputmode="numeric"></div>
+    <div class="fb" id="fb5" aria-live="polite"></div>
+  </div>
+  <div class="card">
+    <h3>Delete anomaly · INV-7002 was billed by mistake and is deleted from the flat sheet. What else is lost?</h3>
+    <div class="opts" id="delOpts"></div>
+    <div class="fb" id="fb6" aria-live="polite"></div>
+  </div>
+  <div class="card">
+    <h3>Insert anomaly · Coral Bay launches service S50, hazmat storage, at 55.00 a week. No customer has bought it yet. Where can the flat sheet record it?</h3>
+    <div class="opts" id="insOpts"></div>
+    <div class="fb" id="fb7" aria-live="polite"></div>
+  </div>
+  <div class="btns"><button class="btn" id="check4" type="button">Check and see my results</button></div>
+</section>
+
+<!-- RESULTS -->
+<section class="round" id="r5" hidden>
+  <h2>Your results</h2>
+  <p class="lead">Take a screenshot of this screen for Assignment 2.1. Use the summary to decide what to review before you normalize your own file.</p>
+  <div class="final">
+    <div class="stat"><div class="v" id="fScore">0</div><div class="k">Points of 16</div></div>
+    <div class="stat"><div class="v" id="fDeps">0</div><div class="k">Dependencies right first try</div></div>
+    <div class="stat"><div class="v" id="fTables">0</div><div class="k">Tables in your design</div></div>
+    <div class="stat"><div class="v" id="fTime">0</div><div class="k">Minutes</div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h3>What to take into your assignment</h3><div id="advice"></div></div>
+  <div class="btns"><button class="btn ghost" id="restart" type="button">Start over</button></div>
+</section>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+const $ = id => document.getElementById(id);
+const t0 = Date.now();
+
+/* ---------------- data ---------------- */
+const INV = [
+ {inv:"INV-7001",date:"2026-03-02",cid:"C12",cname:"Palmetto Pool Supply",city:"Doral",rid:"R3",rname:"Yesenia Cruz",
+  sv:[["S10","Pallet storage (week)","18.00",4],["S22","Liftgate delivery","45.00",1]]},
+ {inv:"INV-7002",date:"2026-03-02",cid:"C07",cname:"Bayfront Marine Supply",city:"Miami",rid:"R1",rname:"Andre Wilson",
+  sv:[["S10","Pallet storage (week)","18.00",6]]},
+ {inv:"INV-7003",date:"2026-03-03",cid:"C12",cname:"Palmetto Pool Supply",city:"Doral",rid:"R3",rname:"Yesenia Cruz",
+  sv:[["S31","Cross-dock transfer","60.00",2],["S22","Liftgate delivery","45.00",1]]},
+ {inv:"INV-7004",date:"2026-03-04",cid:"C19",cname:"Citrus Medical Supply",city:"Hialeah",rid:"R1",rname:"Andre Wilson",
+  sv:[["S40","Cold storage (week)","32.50",3],["S10","Pallet storage (week)","18.00",2]]},
+ {inv:"INV-7005",date:"2026-03-05",cid:"C12",cname:"Palmetto Pool Supply",city:"Doral",rid:"R2",rname:"Omar Perez",
+  sv:[["S22","Liftgate delivery","45.00",2]]}
+];
+const money = v => v.toFixed(2);
+const UNF_COLS = ["invoice_no","invoice_date","customer_id","customer_name","customer_city","rep_id","rep_name","services"];
+const NF1_COLS = ["invoice_no","service_code","invoice_date","customer_id","customer_name","customer_city","rep_id","rep_name","service_name","list_rate","qty","line_total"];
+const nf1Rows = [];
+INV.forEach(i=>i.sv.forEach(s=>nf1Rows.push([i.inv,s[0],i.date,i.cid,i.cname,i.city,i.rid,i.rname,s[1],s[2],s[3],money(+s[2]*s[3])])));
+
+/* ---------------- state ---------------- */
+let score = 0;
+const got = {q1:false,q2:false};
+let depFirst = null;       // number right on first check
+let depAnswers = {};
+let r4done = false;
+function addScore(n){score+=n; $("score").textContent=score; if(G&&!reduce) G.fromTo("#score",{scale:1.5},{scale:1,duration:.4,ease:"back.out(3)"});}
+function setStep(r){
+  document.querySelectorAll(".steps span").forEach(s=>{const n=+s.dataset.r; s.classList.toggle("on",n===r); s.classList.toggle("done",n<r);});
+  for(let i=1;i<=5;i++) $("r"+i).hidden = i!==r;
+  window.scrollTo({top:0,behavior:reduce?"auto":"smooth"});
+  if(G&&!reduce) G.from("#r"+r+" .card, #r"+r+" h2, #r"+r+" .lead",{y:14,opacity:0,duration:.4,stagger:.07,ease:"power2.out"});
+}
+
+/* ---------------- round 1 ---------------- */
+function drawUNF(){
+  const head = "<thead><tr>"+UNF_COLS.map(c=>`<th scope="col" data-c="${c}"><button type="button" data-c="${c}">${c}</button></th>`).join("")+"</tr></thead>";
+  const body = "<tbody>"+INV.map(i=>`<tr><td>${i.inv}</td><td>${i.date}</td><td>${i.cid}</td><td>${i.cname}</td><td>${i.city}</td><td>${i.rid}</td><td>${i.rname}</td><td class="wrapcell">${i.sv.map(s=>`${s[0]} ${s[1]} x${s[3]} @ ${s[2]} = ${money(+s[2]*s[3])}`).join("; ")}</td></tr>`).join("")+"</tbody>";
+  $("unf").innerHTML = head+body;
+  $("unf").querySelectorAll("th button").forEach(b=>b.addEventListener("click",()=>pickCol(b.dataset.c)));
+}
+let q1tries = 0;
+function pickCol(c){
+  if(got.q1) return;
+  q1tries++;
+  $("unf").querySelectorAll("th").forEach(th=>th.classList.toggle("sel",th.dataset.c===c));
+  const fb=$("fb1");
+  if(c==="services"){
+    got.q1=true; fb.className="fb ok";
+    fb.innerHTML = `Correct${q1tries===1?" (+1)":""}. One <code>services</code> cell holds several services, and each service packs a code, a name, a quantity, a rate and a total into one string. That is a multi-valued, compound cell.`;
+    if(q1tries===1) addScore(1);
+    showQ2();
+  } else {
+    fb.className="fb bad";
+    const why = {invoice_no:"Each cell has one invoice number.",customer_name:"Repeated, yes, but each cell holds one name. Repetition is a 2NF or 3NF problem, not a 1NF problem.",
+      customer_city:"Each cell holds one city. Repetition is not a 1NF violation.",rep_name:"Each cell holds one name. Look for a cell that holds a list."};
+    fb.textContent = (why[c]||"Each cell in that column holds a single value.")+" Try again.";
+  }
+}
+function showQ2(){
+  $("q2card").hidden=false;
+  const head="<thead><tr>"+NF1_COLS.map(c=>`<th scope="col">${c}</th>`).join("")+"</tr></thead>";
+  $("nf1").innerHTML = head+"<tbody>"+nf1Rows.map(r=>"<tr>"+r.map(v=>`<td>${v}</td>`).join("")+"</tr>").join("")+"</tbody>";
+  if(G&&!reduce){G.from("#q2card",{y:16,opacity:0,duration:.4}); G.from("#nf1 tbody tr",{x:-14,opacity:0,stagger:.05,duration:.3,delay:.2});}
+  const opts=[["a","invoice_no","bad","INV-7001 appears on two rows now, so invoice_no alone is not unique."],
+              ["b","service_code","bad","S10 and S22 each appear on several invoices."],
+              ["c","(invoice_no, service_code)","ok","Each invoice lists a service at most once, so the pair is unique. This is a composite key."],
+              ["d","(invoice_no, customer_id)","bad","Still repeats: INV-7001 with C12 appears on two rows."]];
+  $("keyOpts").innerHTML = opts.map(o=>`<label class="opt" data-k="${o[0]}"><input type="radio" name="key" value="${o[0]}"><code>${o[1]}</code></label>`).join("");
+  let tries=0;
+  $("keyOpts").querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>{
+    if(got.q2) return;
+    tries++;
+    const o=opts.find(x=>x[0]===inp.value), lab=inp.closest(".opt");
+    $("keyOpts").querySelectorAll(".opt").forEach(l=>l.classList.remove("ok","bad"));
+    lab.classList.add(o[2]); const fb=$("fb2"); fb.className="fb "+o[2];
+    fb.textContent = (o[2]==="ok"?"Correct"+(tries===1?" (+1). ":". "):"Not quite. ")+o[3];
+    if(o[2]==="ok"){got.q2=true; if(tries===1) addScore(1); $("to2").disabled=false; $("keyOpts").querySelectorAll("input").forEach(i=>i.disabled=true);}
+  }));
+}
+
+/* ---------------- round 2 ---------------- */
+const CHOICES = [["whole","the whole key (invoice_no + service_code)"],["inv","invoice_no only"],["svc","service_code only"],
+                 ["cid","customer_id (a non-key column)"],["rid","rep_id (a non-key column)"],["calc","nothing: it can be calculated, so do not store it"]];
+const DEPS = [
+ ["invoice_date","inv","An invoice has one date no matter which service you look at."],
+ ["customer_id","inv","Each invoice is billed to one customer. It stays in the invoice table as a foreign key."],
+ ["customer_name","cid","The name belongs to the customer. C12 is always Palmetto Pool Supply, whatever the invoice. That is a transitive dependency: invoice_no → customer_id → customer_name."],
+ ["customer_city","cid","The city is a fact about the customer, reached through customer_id. Transitive."],
+ ["rep_id","inv","One sales rep is credited per invoice. Note INV-7005 has R2 for customer C12, so the rep is not a fact about the customer."],
+ ["rep_name","rid","R1 is always Andre Wilson. The name depends on rep_id, a non-key column. Transitive."],
+ ["service_name","svc","S22 is always Liftgate delivery on every invoice. It depends on only part of the key: a partial dependency."],
+ ["list_rate","svc","The list rate is set per service (S10 is 18.00 everywhere). Partial dependency. If rates changed over time you would also store the billed rate on the line."],
+ ["qty","whole","Quantity needs both: how many of this service on this invoice. This is the only true line fact."],
+ ["line_total","calc","line_total is qty × list_rate. Storing it invites totals that disagree with the inputs. Compute it in a query or a view."]
+];
+function drawDeps(){
+  $("deps").innerHTML = DEPS.map(([c])=>{
+    const sample = nf1Rows[0][NF1_COLS.indexOf(c)];
+    return `<div class="dep" id="dep-${c}"><label class="col" for="sel-${c}">${c}<small>e.g. ${sample}</small></label>
+      <select id="sel-${c}"><option value="">Choose a dependency…</option>${CHOICES.map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select>
+      <div class="why" aria-live="polite"></div></div>`;}).join("");
+  DEPS.forEach(([c])=>$("sel-"+c).addEventListener("change",e=>{depAnswers[c]=e.target.value; const d=$("dep-"+c); d.classList.remove("ok","bad"); d.querySelector(".why").textContent="";}));
+}
+$("check2").addEventListener("click",()=>{
+  const missing = DEPS.filter(([c])=>!depAnswers[c]).length;
+  if(missing){$("fb3").className="fb bad"; $("fb3").textContent=`Choose an answer for every column first (${missing} left).`; return;}
+  let right=0;
+  DEPS.forEach(([c,ans,why])=>{
+    const d=$("dep-"+c), ok=depAnswers[c]===ans; if(ok) right++;
+    d.classList.remove("ok","bad"); d.classList.add(ok?"ok":"bad");
+    d.querySelector(".why").textContent = (ok?"Right. ":"Not quite. ")+why;
+  });
+  if(depFirst===null){depFirst=right; addScore(right);}
+  $("fb3").className = "fb "+(right===10?"ok":"bad");
+  $("fb3").textContent = right===10 ? "All ten dependencies are right. Build your tables."
+    : `${right} of 10 right. You can build your tables now and see what the wrong answers do to the design, or fix them first. Only your first check counts toward the score.`;
+  $("to3").disabled=false;
+  if(G&&!reduce) G.from(".dep .why",{opacity:0,y:-4,stagger:.04,duration:.25});
+});
+
+/* ---------------- round 3 ---------------- */
+const REF = [
+ {name:"customer",cols:[["customer_id","PK"],["customer_name"],["customer_city"]]},
+ {name:"sales_rep",cols:[["rep_id","PK"],["rep_name"]]},
+ {name:"service",cols:[["service_code","PK"],["service_name"],["list_rate"]]},
+ {name:"invoice",cols:[["invoice_no","PK"],["invoice_date"],["customer_id","FK"],["rep_id","FK"]]},
+ {name:"invoice_line",cols:[["invoice_no","PK FK"],["service_code","PK FK"],["qty"]]}
+];
+function buildMine(){
+  const home = {inv:"invoice",svc:"service",whole:"invoice_line",cid:"customer",rid:"sales_rep"};
+  const truth = Object.fromEntries(DEPS.map(d=>[d[0],d[1]]));
+  const tables = {invoice:[["invoice_no","PK"]], invoice_line:[["invoice_no","PK FK"],["service_code","PK FK"]]};
+  const flags = {};
+  const dropped = [];
+  const lost = [];
+  DEPS.forEach(([c])=>{
+    const a = depAnswers[c];
+    if(a==="calc"){dropped.push(c); if(truth[c]!=="calc") lost.push(c); return;}
+    const t = home[a];
+    if(!tables[t]){
+      const pk = {service:"service_code",customer:"customer_id",sales_rep:"rep_id"}[t];
+      tables[t]=[[pk,"PK"]];
+    }
+    if(!tables[t].some(x=>x[0]===c)) tables[t].push([c, (c==="customer_id"||c==="rep_id")&&t==="invoice"?"FK":""]);
+    if(a!==truth[c]){
+      const real = truth[c];
+      const why = real==="calc" ? "derived value stored" :
+                  real==="whole" ? "needs the whole key, 2NF breaks" :
+                  (real==="cid"||real==="rid") ? `depends on ${real==="cid"?"customer_id":"rep_id"}, 3NF breaks` :
+                  (a==="whole" ? "depends on part of the key, 2NF breaks" : "placed with the wrong key");
+      (flags[t]=flags[t]||{})[c]=why;
+    }
+  });
+  // a dependent table needs its key column to exist where it is referenced
+  if(tables.customer && !tables.invoice.some(x=>x[0]==="customer_id")) tables.invoice.push(["customer_id","FK"]);
+  if(tables.sales_rep && !tables.invoice.some(x=>x[0]==="rep_id")) tables.invoice.push(["rep_id","FK"]);
+  // a line fact missing from invoice_line
+  if(!DEPS.some(([c])=>depAnswers[c]==="whole")) (flags.invoice_line=flags.invoice_line||{})["(qty missing)"]="quantity was not kept as a line fact";
+  return {tables,flags,dropped,lost};
+}
+function tblHTML(name,cols,flags){
+  const f = flags||{};
+  const bad = Object.keys(f).length>0;
+  const items = cols.map(([c,k])=>`<li class="${f[c]?"flag":""}">${c}${k?`<span class="k">${k}</span>`:""}${f[c]?` <span>· ${f[c]}</span>`:""}</li>`).join("")
+    + Object.keys(f).filter(k=>!cols.some(c=>c[0]===k)).map(k=>`<li class="flag">${k} <span>· ${f[k]}</span></li>`).join("");
+  return `<div class="tbl"><div class="h"><span>${name}</span><span class="tag ${bad?"bad":"ok"}">${bad?"not 3NF":"3NF"}</span></div><ul>${items}</ul></div>`;
+}
+function drawR3(){
+  const {tables,flags,dropped,lost} = buildMine();
+  const order = ["customer","sales_rep","service","invoice","invoice_line"];
+  $("mine").innerHTML = order.filter(t=>tables[t]).map(t=>tblHTML(t,tables[t],flags[t])).join("")
+    + (dropped.length?`<p style="font-size:13px;color:var(--muted);margin:6px 0 0">Not stored (computed in queries): <code>${dropped.join(", ")}</code></p>`:"")
+    + (lost.length?`<p style="font-size:13px;color:var(--bad);margin:6px 0 0">Data lost: <code>${lost.join(", ")}</code> cannot be calculated from other columns, so dropping it throws information away.</p>`:"");
+  $("ref").innerHTML = REF.map(t=>tblHTML(t.name,t.cols,null)).join("")
+    + `<p style="font-size:13px;color:var(--muted);margin:6px 0 0">Not stored: <code>line_total</code>, computed as <code>qty * list_rate</code>.</p>`;
+  const nbad = Object.values(flags).reduce((a,f)=>a+Object.keys(f).length,0) + lost.length;
+  $("fb4").className = "fb "+(nbad?"bad":"ok");
+  $("fb4").textContent = nbad ? `${nbad} column${nbad>1?"s":""} still violate a normal form. Every red line is a place where the same fact would be stored more than once. Revise your answers to see the design change, or continue.`
+                              : "Your design matches the reference: five tables, every fact stored once, and the derived total left out.";
+  $("fTables").textContent = Object.keys(tables).length;
+  if(G&&!reduce){G.from("#mine .tbl",{y:20,opacity:0,stagger:.12,duration:.45,ease:"power2.out"}); G.from("#ref .tbl",{y:20,opacity:0,stagger:.12,duration:.45,delay:.25,ease:"power2.out"});}
+}
+
+/* ---------------- round 4 ---------------- */
+const DEL = [["a","Nothing else, it was only one invoice","bad"],["b","Customer C07, Bayfront Marine Supply, and its city","ok"],["c","Service S10 and its rate","bad"],["d","Sales rep R1, Andre Wilson","bad"]];
+const INS = [["a","In a new row with an empty invoice_no","bad"],["b","Nowhere until an invoice uses it","ok"],["c","In the services cell of the newest invoice","bad"],["d","In the customer_name column","bad"]];
+function drawOpts(id,arr,name){ $(id).innerHTML = arr.map(o=>`<label class="opt"><input type="radio" name="${name}" value="${o[0]}">${o[1]}</label>`).join(""); }
+$("check4").addEventListener("click",()=>{
+  if(r4done){finish(); return;}
+  const u1=+$("u1").value, u2=+$("u2").value;
+  const del=document.querySelector('input[name="del"]:checked'), ins=document.querySelector('input[name="ins"]:checked');
+  if($("u1").value===""||$("u2").value===""||!del||!ins){$("fb7").className="fb bad";$("fb7").textContent="Answer all four parts first.";return;}
+  let pts=0;
+  const ok1=u1===5, ok2=u2===1;
+  pts += (ok1?1:0)+(ok2?1:0);
+  $("fb5").className="fb "+(ok1&&ok2?"ok":"bad");
+  $("fb5").innerHTML = `1NF: <b>5</b> rows (INV-7001 has 2 lines, INV-7003 has 2, INV-7005 has 1)${ok1?" ✓":""}. 3NF: <b>1</b> row in <code>customer</code>${ok2?" ✓":""}. Miss one of the five and the database reports two different cities for the same customer.`;
+  const okd = DEL.find(x=>x[0]===del.value)[2]==="ok"; if(okd) pts++;
+  $("fb6").className="fb "+(okd?"ok":"bad");
+  $("fb6").textContent = (okd?"Right. ":"Not quite. ")+"INV-7002 is the only row that mentions Bayfront Marine Supply, so deleting the invoice deletes the customer too. S10 and R1 survive because other invoices mention them. In 3NF the customer lives in its own table and survives.";
+  const oki = INS.find(x=>x[0]===ins.value)[2]==="ok"; if(oki) pts++;
+  $("fb7").className="fb "+(oki?"ok":"bad");
+  $("fb7").textContent = (oki?"Right. ":"Not quite. ")+"In the flat sheet a service only exists inside an invoice, so a new service cannot be recorded until someone buys it. In 3NF you insert one row into service the day it launches.";
+  addScore(pts); r4done=true;
+  $("check4").textContent="See my results";
+  document.querySelectorAll("#r4 input").forEach(i=>i.disabled=true);
+});
+
+/* ---------------- results ---------------- */
+function finish(){
+  $("fScore").textContent=score;
+  $("fDeps").textContent=(depFirst??0)+" / 10";
+  $("fTime").textContent=Math.max(1,Math.round((Date.now()-t0)/60000));
+  const wrong = DEPS.filter(([c,a])=>depAnswers[c]!==a).map(d=>d[0]);
+  const tips=[];
+  if(depFirst!==null && depFirst<10){
+    const kinds = new Set(DEPS.filter(([c,a])=>wrongFirst.has(c)).map(([c,a])=>a));
+    if(kinds.has("svc")) tips.push("Review partial dependencies: columns that describe one part of a composite key (here the service) must leave the line table. That is 2NF.");
+    if(kinds.has("cid")||kinds.has("rid")) tips.push("Review transitive dependencies: a column that describes a non-key column (customer, rep) belongs in that thing's own table. That is 3NF.");
+    if(kinds.has("calc")) tips.push("Watch for derived columns such as totals. If a query can compute it, the table should not store it.");
+    if(kinds.has("whole")) tips.push("Find the true line facts. Only a column that needs every part of the key stays in the line table.");
+    if(kinds.has("inv")) tips.push("Remember that some IDs are facts about the parent row. customer_id and rep_id stay in invoice as foreign keys.");
+  }
+  if(!tips.length) tips.push("You applied every rule correctly. In your assignment the same reasoning applies, but you must prove each dependency with a GROUP BY ... HAVING query before you split.");
+  tips.push("Your assignment file uses repeating column groups (part1, part2, ...) instead of a list in one cell. Unpivot them in 1NF the same way you split the services here.");
+  $("advice").innerHTML = "<ul style='margin:0;padding-left:18px'>"+tips.map(t=>`<li style='margin-bottom:6px'>${t}</li>`).join("")+"</ul>";
+  setStep(5);
+}
+const wrongFirst = new Set();
+$("check2").addEventListener("click",()=>{ if(wrongFirst.size===0 && depFirst!==null && !wrongFirst._set){ DEPS.forEach(([c,a])=>{if(depAnswers[c]!==a) wrongFirst.add(c);}); wrongFirst._set=true; } });
+
+/* ---------------- navigation ---------------- */
+$("to2").addEventListener("click",()=>setStep(2));
+$("to3").addEventListener("click",()=>{drawR3(); setStep(3);});
+$("back2").addEventListener("click",()=>setStep(2));
+$("to4").addEventListener("click",()=>{setStep(4);});
+$("restart").addEventListener("click",()=>{
+  score=0; $("score").textContent="0"; got.q1=got.q2=false; q1tries=0; depFirst=null; depAnswers={}; r4done=false; wrongFirst.clear(); wrongFirst._set=false;
+  ["fb1","fb2","fb3","fb4","fb5","fb6","fb7"].forEach(id=>{$(id).textContent="";$(id).className="fb";});
+  $("q2card").hidden=true; $("to2").disabled=true; $("to3").disabled=true; $("check4").textContent="Check and see my results";
+  ["u1","u2"].forEach(id=>{$(id).value="";$(id).disabled=false;});
+  init(); setStep(1);
+});
+function init(){ drawUNF(); drawDeps(); drawOpts("delOpts",DEL,"del"); drawOpts("insOpts",INS,"ins"); }
+init(); setStep(1);
+})();
+</script>
+
+</html>

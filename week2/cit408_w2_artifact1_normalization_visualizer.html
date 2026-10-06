@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coral Bay Normalization Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: stage rail on top, tables on the left, rule + anomaly meter on the right; stacks on phones */
+:root{
+  --paper:#F7F3EE; --surface:#FFFFFF; --ink:#171310; --muted:#6B5F57; --line:#DED8D2;
+  --maroon:#990000; --maroon-deep:#800000; --accent:#C00000; --grey:#D9D9D9;
+  --code-bg:#1E1A17; --code-fg:#F3EDE6;
+  --g-ship:#F6DADA; --g-ship-b:#B22222;
+  --g-cust:#DCE8F7; --g-cust-b:#2F6DB5;
+  --g-drv:#DDF0E1; --g-drv-b:#2E7D4A;
+  --g-trk:#F8EACB; --g-trk-b:#A06A00;
+  --g-com:#ECE0F5; --g-com-b:#7444A0;
+  --g-line:#ECEAE7; --g-line-b:#6B5F57;
+  --hit:#FFE36E; --hit-ink:#171310;
+  --f-display:'Questrial','Century Gothic',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --maroon-deep:#8E1010; --accent:#FF6B6B; --grey:#2C2522;
+  --code-bg:#0E0B0A; --code-fg:#F3EDE6;
+  --g-ship:#4A1F1F; --g-ship-b:#FF8A8A; --g-cust:#1C2D44; --g-cust-b:#8DB9F0;
+  --g-drv:#1C3826; --g-drv-b:#8FD6A6; --g-trk:#3D2F12; --g-trk-b:#F2C46A;
+  --g-com:#33224A; --g-com-b:#C9A4EE; --g-line:#2E2724; --g-line-b:#B5A79D;
+  --hit:#E8C93A; --hit-ink:#171310; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --maroon-deep:#8E1010; --accent:#FF6B6B; --grey:#2C2522;
+  --code-bg:#0E0B0A; --code-fg:#F3EDE6;
+  --g-ship:#4A1F1F; --g-ship-b:#FF8A8A; --g-cust:#1C2D44; --g-cust-b:#8DB9F0;
+  --g-drv:#1C3826; --g-drv-b:#8FD6A6; --g-trk:#3D2F12; --g-trk-b:#F2C46A;
+  --g-com:#33224A; --g-com-b:#C9A4EE; --g-line:#2E2724; --g-line-b:#B5A79D;
+  --hit:#E8C93A; --hit-ink:#171310; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-display);font-size:15px;line-height:1.55;margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 16px 40px}
+header.top{background:var(--maroon);color:#fff;padding:16px 20px}
+header.top .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.9}
+header.top h1{margin:2px 0 0;font-size:24px;font-weight:400;text-wrap:balance}
+header.top p{margin:6px 0 0;font-size:14px;opacity:.92;max-width:70ch}
+.rail{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
+.rail button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;display:flex;flex-direction:column;align-items:flex-start;min-width:150px;flex:1 1 150px;text-align:left}
+.rail button .n{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.rail button .t{font-size:16px}
+.rail button[aria-selected="true"]{background:var(--maroon);border-color:var(--maroon);color:#fff}
+.rail button[aria-selected="true"] .n{color:#fff;opacity:.85}
+button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage{min-width:0}
+.tables{display:flex;flex-direction:column;gap:16px}
+.tcard{background:var(--surface);border:1px solid var(--line);min-width:0}
+.tcard .th{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tcard .th b{font-family:var(--f-mono);font-size:14px}
+.tcard .th span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-family:var(--f-mono);font-size:12px;width:100%}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left;vertical-align:top}
+th{font-weight:600;font-size:11px}
+th .pk{color:var(--accent);margin-left:4px}
+th .fk{color:var(--muted);margin-left:4px}
+.g-ship{background:var(--g-ship)} .g-cust{background:var(--g-cust)} .g-drv{background:var(--g-drv)}
+.g-trk{background:var(--g-trk)} .g-com{background:var(--g-com)} .g-line{background:var(--g-line)}
+th.g-ship{box-shadow:inset 0 -3px 0 var(--g-ship-b)} th.g-cust{box-shadow:inset 0 -3px 0 var(--g-cust-b)}
+th.g-drv{box-shadow:inset 0 -3px 0 var(--g-drv-b)} th.g-trk{box-shadow:inset 0 -3px 0 var(--g-trk-b)}
+th.g-com{box-shadow:inset 0 -3px 0 var(--g-com-b)} th.g-line{box-shadow:inset 0 -3px 0 var(--g-line-b)}
+td.multi{white-space:normal;min-width:260px;outline:2px dashed var(--accent);outline-offset:-3px}
+td.hit{background:var(--hit)!important;color:var(--hit-ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin:0 0 12px}
+.legend i{display:inline-block;width:12px;height:12px;vertical-align:-1px;margin-right:5px;border:1px solid var(--line)}
+aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);padding:14px 16px}
+.panel h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 8px;font-weight:400}
+.panel p{margin:0 0 10px}
+.panel ul{margin:0 0 6px;padding-left:18px}
+.panel li{margin-bottom:4px}
+.rule{border-left:4px solid var(--accent);padding:8px 12px;background:var(--paper);margin:0 0 10px}
+code,.mono{font-family:var(--f-mono);font-size:12.5px}
+.fd{font-family:var(--f-mono);font-size:12px;display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px dotted var(--line)}
+.fd .sw{width:10px;height:10px;flex:none}
+.meter{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.bar{display:grid;grid-template-columns:44px 1fr 32px;gap:8px;align-items:center;font-size:12px;font-variant-numeric:tabular-nums}
+.bar .trk{height:14px;background:var(--paper);border:1px solid var(--line);position:relative}
+.bar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--maroon);width:0}
+.bar.cur .fill{background:var(--accent)}
+.bar.cur b{color:var(--accent)}
+.btn{font:inherit;cursor:pointer;background:var(--maroon);color:#fff;border:0;padding:9px 14px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.live{font-size:13px;min-height:2.6em;color:var(--ink)}
+.live b{color:var(--accent)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.stat{border:1px solid var(--line);padding:8px 10px}
+.stat .v{font-size:22px;font-variant-numeric:tabular-nums}
+.stat .k{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.navrow{display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
+footer{margin-top:24px;font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="kicker">CIT 408 · Module 2 · Activity 2.1</div>
+  <h1>From one spreadsheet to seven tables</h1>
+  <p>Six real rows from the Coral Bay Logistics dispatch file. Step through each normal form and watch where every column goes, then test how many rows a single phone number change touches at each stage.</p>
+</header>
+
+<div class="wrap">
+  <div class="rail" role="tablist" aria-label="Normalization stages" id="rail"></div>
+
+  <div class="legend" id="legend" aria-label="Column color legend"></div>
+
+  <div class="grid">
+    <section class="stage" aria-label="Tables at this stage">
+      <div class="tables" id="tables"></div>
+      <div class="navrow">
+        <button class="btn ghost" id="prev" type="button">Previous stage</button>
+        <button class="btn" id="next" type="button">Next stage</button>
+      </div>
+    </section>
+
+    <aside>
+      <div class="panel" id="explain" aria-live="polite"></div>
+
+      <div class="panel">
+        <h2>Update anomaly test</h2>
+        <p>Sunrise Wholesale Foods (C043) gets a new phone number. How many rows must change?</p>
+        <div class="row">
+          <button class="btn" id="hitBtn" type="button">Highlight the cells to change</button>
+          <button class="btn ghost" id="clearBtn" type="button">Clear</button>
+        </div>
+        <div class="live" id="hitLive" aria-live="polite"></div>
+        <div class="meter" id="meter" aria-label="Rows to update at each stage"></div>
+        <div class="stats">
+          <div class="stat"><div class="v" id="sCells">0</div><div class="k">Values stored</div></div>
+          <div class="stat"><div class="v" id="sTables">0</div><div class="k">Tables</div></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>Data: the first shipments for customers C009 and C043 in coralbay_shipments_unf.csv (1,200 rows). Your full file normalizes to the same seven tables in PostgreSQL.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+
+/* ---------- source rows (real data from the class file) ---------- */
+const SHIP = [
+ ["SHP-100010","2026-01-06","C009","Harbor Home Center","(239) 450-1169","D06","Marcus Ramirez","TRK-125","Volvo VNL 860","CM131:Muriatic acid case:9; CM171:Refrigerant cylinder case:9"],
+ ["SHP-100014","2026-01-07","C043","Sunrise Wholesale Foods","(239) 276-1765","D19","Ramon Ramirez","TRK-114","Kenworth T680","CM120:PVC pipe bundle:8; CM181:Roofing shingle pallet:9"],
+ ["SHP-100052","2026-01-15","C043","Sunrise Wholesale Foods","(239) 276-1765","D13","Luis Garcia","TRK-114","Kenworth T680","CM120:PVC pipe bundle:2"],
+ ["SHP-100117","2026-01-28","C009","Harbor Home Center","(239) 450-1169","D21","Paola Rodriguez","TRK-122","International LT","CM190:Paint bucket pallet:5; CM151:Outboard motor crate:7"],
+ ["SHP-100164","2026-02-06","C009","Harbor Home Center","(239) 450-1169","D20","Paola Ortiz","TRK-126","Kenworth T680","CM120:PVC pipe bundle:7; CM110:Drywall sheet bundle:4"],
+ ["SHP-100247","2026-02-23","C043","Sunrise Wholesale Foods","(239) 276-1765","D22","Hector Ramirez","TRK-113","Kenworth T680","CM141:Fresh produce pallet:4; CM142:Canned goods pallet:9"]
+];
+const COLS = ["shipment_id","ship_date","customer_id","customer_name","customer_phone","driver_id","driver_name","truck_id","truck_make","commodities"];
+const GROUP = {shipment_id:"ship",ship_date:"ship",customer_id:"cust",customer_name:"cust",customer_phone:"cust",
+  driver_id:"drv",driver_name:"drv",truck_id:"trk",truck_make:"trk",commodities:"com",
+  commodity_code:"com",commodity_name:"com",quantity:"line"};
+// In tables where an *_id is a foreign key, it stays the colour of the table it points to.
+const LEG = [["ship","Shipment facts"],["cust","Customer facts"],["drv","Driver facts"],["trk","Truck facts"],["com","Commodity facts"],["line","Line facts (need the whole key)"]];
+const TARGET = "(239) 276-1765";
+
+const lines = [];
+SHIP.forEach(r=>{
+  r[9].split(";").forEach(it=>{
+    const [code,name,qty]=it.trim().split(":");
+    lines.push([r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],code,name,qty]);
+  });
+});
+const L_COLS = ["shipment_id","ship_date","customer_id","customer_name","customer_phone","driver_id","driver_name","truck_id","truck_make","commodity_code","commodity_name","quantity"];
+
+function distinct(rows, idx){
+  const seen = new Map();
+  rows.forEach(r=>{const v = idx.map(i=>r[i]); const k=v.join("|"); if(!seen.has(k)) seen.set(k,v);});
+  return [...seen.values()];
+}
+function pick(cols){return cols.map(c=>L_COLS.indexOf(c));}
+
+/* ---------- the four stages ---------- */
+const STAGES = [
+ { id:"unf", n:"Stage 0", t:"Unnormalized",
+   tables:[{name:"dispatch_sheet", cols:COLS, pk:[], fk:[], rows:SHIP, multi:"commodities"}],
+   rule:"No rule is met yet. One cell holds a list, and nothing guarantees a row is unique.",
+   body:"<p>This is the file as dispatch keeps it. The dashed <code>commodities</code> cell packs two or more facts, each with a code, a name and a quantity. SQL cannot join, total or index what is hidden inside a string.</p><p>Look at the colors: one row mixes facts about five different things.</p>"},
+ { id:"1nf", n:"Stage 1", t:"First normal form",
+   tables:[{name:"shipment_lines", cols:L_COLS, pk:["shipment_id","commodity_code"], fk:[], rows:lines}],
+   rule:"Every cell holds one value, there are no repeating groups, and a primary key identifies each row.",
+   body:"<p>Each commodity became its own row and the string became three columns. A shipment now spans several rows, so <code>shipment_id</code> alone repeats. The key is the pair <code>(shipment_id, commodity_code)</code>.</p><p>Notice that redundancy went <b>up</b>: the customer phone is now stored on every line. 1NF makes the data queryable; the next steps remove the copies.</p>",
+   fds:[["ship","shipment_id → ship_date, customer_id, driver_id, truck_id","partial"],["com","commodity_code → commodity_name","partial"],["line","(shipment_id, commodity_code) → quantity","full"],["cust","customer_id → customer_name, customer_phone","transitive"],["drv","driver_id → driver_name","transitive"],["trk","truck_id → truck_make","transitive"]]},
+ { id:"2nf", n:"Stage 2", t:"Second normal form",
+   tables:[
+     {name:"shipment", cols:["shipment_id","ship_date","customer_id","customer_name","customer_phone","driver_id","driver_name","truck_id","truck_make"], pk:["shipment_id"], fk:[], rows:distinct(lines,pick(["shipment_id","ship_date","customer_id","customer_name","customer_phone","driver_id","driver_name","truck_id","truck_make"]))},
+     {name:"commodity", cols:["commodity_code","commodity_name"], pk:["commodity_code"], fk:[], rows:distinct(lines,pick(["commodity_code","commodity_name"]))},
+     {name:"shipment_line", cols:["shipment_id","commodity_code","quantity"], pk:["shipment_id","commodity_code"], fk:["shipment_id","commodity_code"], rows:distinct(lines,pick(["shipment_id","commodity_code","quantity"]))}],
+   rule:"In 1NF, and every non-key column depends on the whole key, not just part of it.",
+   body:"<p>Columns that depended on <code>shipment_id</code> alone moved to <code>shipment</code>. The commodity name depended on <code>commodity_code</code> alone, so it moved to <code>commodity</code>. Only <code>quantity</code> needs both parts of the key, so it stays in <code>shipment_line</code>.</p><p>The <code>shipment</code> table still mixes colors. That is the sign 3NF has work left.</p>"},
+ { id:"3nf", n:"Stage 3", t:"Third normal form",
+   tables:[
+     {name:"customer", cols:["customer_id","customer_name","customer_phone"], pk:["customer_id"], fk:[], rows:distinct(lines,pick(["customer_id","customer_name","customer_phone"]))},
+     {name:"driver", cols:["driver_id","driver_name"], pk:["driver_id"], fk:[], rows:distinct(lines,pick(["driver_id","driver_name"]))},
+     {name:"truck", cols:["truck_id","truck_make"], pk:["truck_id"], fk:[], rows:distinct(lines,pick(["truck_id","truck_make"]))},
+     {name:"shipment", cols:["shipment_id","ship_date","customer_id","driver_id","truck_id"], pk:["shipment_id"], fk:["customer_id","driver_id","truck_id"], rows:distinct(lines,pick(["shipment_id","ship_date","customer_id","driver_id","truck_id"]))},
+     {name:"commodity", cols:["commodity_code","commodity_name"], pk:["commodity_code"], fk:[], rows:distinct(lines,pick(["commodity_code","commodity_name"]))},
+     {name:"shipment_line", cols:["shipment_id","commodity_code","quantity"], pk:["shipment_id","commodity_code"], fk:["shipment_id","commodity_code"], rows:distinct(lines,pick(["shipment_id","commodity_code","quantity"]))}],
+   rule:"In 2NF, and no non-key column depends on another non-key column.",
+   body:"<p>In <code>shipment</code>, the customer name and phone depended on <code>customer_id</code>, not on the shipment. They moved to <code>customer</code>, and <code>customer_id</code> stayed behind as a foreign key. Driver and truck followed the same pattern.</p><p>Every table is now one color plus its foreign keys. Each fact is stored once. (The full file also has a terminal table, which this sample leaves out.)</p>"}
+];
+
+/* ---------- rendering ---------- */
+const rail = document.getElementById("rail");
+const tablesEl = document.getElementById("tables");
+const explain = document.getElementById("explain");
+const meter = document.getElementById("meter");
+const hitLive = document.getElementById("hitLive");
+let cur = 0, hitOn = false;
+
+document.getElementById("legend").innerHTML = LEG.map(([g,l])=>`<span><i class="g-${g}"></i>${l}</span>`).join("");
+
+STAGES.forEach((s,i)=>{
+  const b=document.createElement("button");
+  b.type="button"; b.setAttribute("role","tab"); b.id="tab-"+s.id;
+  b.innerHTML=`<span class="n">${s.n}</span><span class="t">${s.t}</span>`;
+  b.addEventListener("click",()=>go(i));
+  rail.appendChild(b);
+});
+
+function rowsToChange(stage){
+  let n=0; stage.tables.forEach(t=>{const i=t.cols.indexOf("customer_phone"); if(i>=0) t.rows.forEach(r=>{if(r[i]===TARGET) n++;});}); return n;
+}
+function cellsStored(stage){return stage.tables.reduce((a,t)=>a+t.cols.length*t.rows.length,0);}
+
+function drawMeter(){
+  const counts = STAGES.map(rowsToChange);
+  const max = Math.max(...counts);
+  meter.innerHTML = STAGES.map((s,i)=>`<div class="bar ${i===cur?'cur':''}"><span>${s.id.toUpperCase()}</span><div class="trk"><div class="fill" data-w="${counts[i]/max*100}"></div></div><b>${counts[i]}</b></div>`).join("");
+  meter.querySelectorAll(".fill").forEach(f=>{
+    if(reduce||!G){f.style.width=f.dataset.w+"%";}
+    else G.to(f,{width:f.dataset.w+"%",duration:.6,ease:"power2.out"});
+  });
+}
+
+function tableHTML(t){
+  const head = t.cols.map(c=>{
+    const g = GROUP[c]||"ship";
+    const pk = t.pk.includes(c)?'<span class="pk" title="primary key">PK</span>':"";
+    const fk = t.fk.includes(c)?'<span class="fk" title="foreign key">FK</span>':"";
+    return `<th class="g-${g}" scope="col">${c}${pk}${fk}</th>`;
+  }).join("");
+  const body = t.rows.map(r=>"<tr>"+r.map((v,i)=>{
+    const c=t.cols[i], g=GROUP[c]||"ship";
+    const multi = t.multi===c?" multi":"";
+    const hit = hitOn && c==="customer_phone" && v===TARGET ? " hit":"";
+    return `<td class="g-${g}${multi}${hit}">${v}</td>`;}).join("")+"</tr>").join("");
+  const key = t.pk.length? `key (${t.pk.join(", ")})` : "no key";
+  return `<div class="tcard"><div class="th"><b>${t.name}</b><span>${t.rows.length} rows · ${t.cols.length} columns · ${key}</span></div><div class="scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+
+function render(animate){
+  const s = STAGES[cur];
+  tablesEl.innerHTML = s.tables.map(tableHTML).join("");
+  let fdHTML = "";
+  if(s.fds){
+    fdHTML = "<h2 style='margin-top:12px'>Dependencies found in this table</h2>"+
+      s.fds.map(([g,t,k])=>`<div class="fd"><span class="sw" style="background:var(--g-${g}-b)"></span><span style="flex:1">${t}</span><span style="color:var(--muted)">${k}</span></div>`).join("");
+  }
+  explain.innerHTML = `<h2>${s.n}: ${s.t}</h2><div class="rule">${s.rule}</div>${s.body}${fdHTML}`;
+  [...rail.children].forEach((b,i)=>b.setAttribute("aria-selected", i===cur?"true":"false"));
+  document.getElementById("prev").disabled = cur===0;
+  document.getElementById("next").textContent = cur===STAGES.length-1 ? "Start over" : "Next stage";
+  document.getElementById("sCells").textContent = cellsStored(s);
+  document.getElementById("sTables").textContent = s.tables.length;
+  drawMeter();
+  if(animate && G && !reduce){
+    G.from(tablesEl.querySelectorAll(".tcard"),{y:18,opacity:0,duration:.45,stagger:.12,ease:"power2.out"});
+    G.from(tablesEl.querySelectorAll("tbody tr"),{x:-10,opacity:0,duration:.3,stagger:.02,delay:.15});
+  }
+  if(hitOn) announceHits();
+}
+
+function announceHits(){
+  const s=STAGES[cur], n=rowsToChange(s);
+  hitLive.innerHTML = `In <b>${s.t.toLowerCase()}</b>, the phone is stored in <b>${n}</b> row${n===1?"":"s"}. Miss one and the database disagrees with itself.`;
+  if(G && !reduce) G.fromTo(tablesEl.querySelectorAll("td.hit"),{scale:1.15},{scale:1,duration:.4,stagger:.06,ease:"back.out(3)"});
+}
+
+function go(i){
+  if(i===cur) return;
+  const out = tablesEl.querySelectorAll(".tcard");
+  cur = i;
+  if(G && !reduce && out.length){G.to(out,{opacity:0,y:-8,duration:.18,onComplete:()=>render(true)});}
+  else render(false);
+}
+
+document.getElementById("prev").addEventListener("click",()=>go(Math.max(0,cur-1)));
+document.getElementById("next").addEventListener("click",()=>go(cur===STAGES.length-1?0:cur+1));
+document.getElementById("hitBtn").addEventListener("click",()=>{hitOn=true;render(false);});
+document.getElementById("clearBtn").addEventListener("click",()=>{hitOn=false;hitLive.textContent="";render(false);});
+rail.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"){go(Math.min(STAGES.length-1,cur+1));rail.children[cur].focus();}
+  if(e.key==="ArrowLeft"){go(Math.max(0,cur-1));rail.children[cur].focus();}
+});
+
+render(false);
+})();
+</script>
+
+</html>
