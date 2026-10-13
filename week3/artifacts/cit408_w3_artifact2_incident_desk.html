@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coral Bay Incident Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a ticket queue rail, one open ticket at a time, score pinned under the header */
+:root{
+  --paper:#F7F3EE; --surface:#FFFFFF; --ink:#171310; --muted:#6B5F57; --line:#DED8D2;
+  --maroon:#990000; --accent:#C00000; --soft:#FBF9F7;
+  --ok:#1F7A45; --ok-bg:#E3F3E9; --bad:#B42318; --bad-bg:#FDECEA; --pri:#A06A00; --pri-bg:#FBEFD6;
+  --f-display:'Questrial','Century Gothic',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --ok:#7FD6A0; --ok-bg:#16301F; --bad:#FF8A80; --bad-bg:#3A1716; --pri:#F2C46A; --pri-bg:#3D2F12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --ok:#7FD6A0; --ok-bg:#16301F; --bad:#FF8A80; --bad-bg:#3A1716; --pri:#F2C46A; --pri-bg:#3D2F12; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-display);font-size:15px;line-height:1.55;margin:0}
+header.top{background:var(--maroon);color:#fff;padding:16px 20px}
+header.top .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.9}
+header.top h1{margin:2px 0 0;font-size:24px;font-weight:400;text-wrap:balance}
+header.top p{margin:6px 0 0;font-size:14px;opacity:.92;max-width:74ch}
+.strip{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.strip .in{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.score{font-variant-numeric:tabular-nums}
+.score b{font-size:20px;color:var(--accent)}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 16px 48px}
+.grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.queue{display:flex;flex-direction:column;gap:6px}
+@media (max-width:860px){.queue{flex-direction:row;overflow-x:auto}}
+.qitem{font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 11px;min-width:200px}
+.qitem .id{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.qitem .t{display:block;font-size:14px}
+.qitem[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.qitem.done .id::after{content:" · solved";color:var(--ok)}
+.ticket{background:var(--surface);border:1px solid var(--line);min-width:0}
+.ticket .th{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ticket .th .id{font-family:var(--f-mono);color:var(--muted);font-size:13px}
+.pri{font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px}
+.pri.p1{background:var(--bad-bg);color:var(--bad)} .pri.p2{background:var(--pri-bg);color:var(--pri)} .pri.p3{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.ticket .body{padding:14px 16px}
+.ticket h2{font-size:21px;font-weight:400;margin:0 0 4px;text-wrap:balance}
+.from{font-size:13px;color:var(--muted);margin:0 0 12px}
+.msg{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin:0 0 14px;max-width:72ch}
+.facts{background:var(--soft);border:1px solid var(--line);padding:10px 14px;margin:0 0 16px}
+.facts h3,.q h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 8px;font-weight:400}
+.facts ul{margin:0;padding-left:18px} .facts li{margin-bottom:3px}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 12px;display:flex;gap:10px}
+.opt .l{font-family:var(--f-mono);color:var(--muted)}
+.opt.ok{border-color:var(--ok);background:var(--ok-bg)} .opt.bad{border-color:var(--bad);background:var(--bad-bg)}
+.opt[disabled]{cursor:default}
+.fb{margin-top:10px;padding:10px 12px;border-left:4px solid var(--line);background:var(--soft);font-size:14px}
+.fb.ok{border-color:var(--ok)} .fb.bad{border-color:var(--bad)}
+.fb:empty{display:none}
+.order{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.order li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);padding:7px 9px}
+.order li .n{font-family:var(--f-mono);color:var(--muted);font-size:13px}
+.order li.ok{border-color:var(--ok);background:var(--ok-bg)} .order li.bad{border-color:var(--bad);background:var(--bad-bg)}
+.mv{display:flex;gap:4px}
+.mv button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--paper);color:var(--ink);width:32px;height:30px;padding:0}
+.btn{font:inherit;cursor:pointer;background:var(--maroon);color:#fff;border:0;padding:10px 18px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.q{margin-top:18px}
+code{font-family:var(--f-mono);font-size:12.5px}
+.final{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:12px;margin:12px 0 16px}
+.final .stat{border:1px solid var(--line);padding:12px;background:var(--surface)}
+.final .v{font-size:30px;font-variant-numeric:tabular-nums}
+.final .k{font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.rev{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.rev li{border:1px solid var(--line);padding:10px 12px;background:var(--surface);font-size:14px}
+.rev li.ok{border-left:4px solid var(--ok)} .rev li.bad{border-left:4px solid var(--bad)}
+.rev small{display:block;color:var(--muted);margin-top:3px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="kicker">CIT 408 · Module 3 · Activity 3.2</div>
+  <h1>Coral Bay incident desk</h1>
+  <p>You are the DBA on call. Six tickets are waiting. For each one, choose how to get the data back, then put the recovery steps in order. Your score counts first attempts, the way an incident review would.</p>
+</header>
+
+<div class="strip"><div class="in">
+  <span id="progress">0 of 6 tickets solved</span>
+  <span class="score" aria-live="polite">Score <b id="score">0</b> / 18</span>
+</div></div>
+
+<div class="wrap">
+  <div class="grid">
+    <nav class="queue" id="queue" aria-label="Ticket queue"></nav>
+    <section class="ticket" id="ticket" aria-live="polite"></section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+const $ = id => document.getElementById(id);
+
+const FACTS_STD = ["Nightly custom-format <code>pg_dump</code> at 02:00, kept 14 days",
+                   "Base backup at 02:00 every night, kept 14 days",
+                   "WAL archived every minute (<code>archive_timeout = 60</code>) and copied off the server",
+                   "One streaming replica in the same data center"];
+
+const T = [
+ { id:"INC-3101", pri:"p1", title:"Developer dropped a production table",
+   from:"Marcus Ortiz, developer · 10:21",
+   msg:"I ran my cleanup script against production instead of my laptop. It dropped <code>ops.tracking_event</code> at 10:05. Customers can't see where their freight is. Everything else is working and dispatch has been entering shipments all morning.",
+   facts:FACTS_STD,
+   opts:[["Restore <code>ops.tracking_event</code> from last night's dump with <code>pg_restore -t</code>","bad","The table comes back as it was at 02:00. Eight hours of tracking events are lost even though the WAL holds every one of them."],
+         ["Run point-in-time recovery on production to 10:04:59","bad","That brings the table back, but it also throws away every shipment dispatch entered between 10:05 and now, in every other table."],
+         ["Recover a separate copy of the server to 10:04:59, dump just that table from the copy, and restore it into production","ok","The copy gives you the table exactly as it was a second before the DROP, and production keeps all of its other work."],
+         ["Copy the table back from the replica","bad","The replica applied the DROP within milliseconds. A replica protects you from hardware failure, not from mistakes."]],
+   order:{ prompt:"Put the table rescue in order.",
+     steps:["Save evidence: the DROP line from the server log and the time you were told",
+            "Start a second container from a copy of the 02:00 base backup, with its own port",
+            "Recover that copy to 10:04:59 with restore_command and recovery_target_time",
+            "pg_dump only ops.tracking_event from the recovered copy",
+            "pg_restore that dump into production",
+            "Compare the row count with the copy, then remove the copy"] } },
+ { id:"INC-3102", pri:"p3", title:"Move the database to a new server",
+   from:"Ana Reyes, IT manager · Monday 09:00",
+   msg:"The new VM is ready with PostgreSQL 18. The old one runs PostgreSQL 16. Please move the <code>coralbay</code> database this weekend.",
+   facts:["The old server runs PostgreSQL 16, the new one PostgreSQL 18","The database is 2 GB","Downtime of an hour on Saturday night is approved","Both servers can reach each other over the network"],
+   opts:[["Take a <code>pg_basebackup</code> of the old server and start it on the new one","bad","A base backup is a copy of the data files, and data files are only readable by the same major version. PostgreSQL 18 will refuse to start on them."],
+         ["<code>pg_dump</code> the database from the old server and <code>pg_restore</code> it on the new one, plus <code>pg_dumpall --globals-only</code> for the roles","ok","A logical dump is SQL and data, so it can move between major versions. The globals dump carries the roles and passwords that pg_dump leaves out."],
+         ["Copy the WAL archive to the new server and replay it","bad","WAL is also tied to the major version, and it needs a base backup to start from."],
+         ["Use <code>docker cp</code> to copy the data directory","bad","That is a physical copy too, with the same version problem, and copying a running data directory gives you an inconsistent one."]] },
+ { id:"INC-3103", pri:"p1", title:"The database server is gone",
+   from:"Azure alert · 15:10",
+   msg:"The VM's disk failed. The server, its data directory and its pg_wal folder are lost. A new VM is being created now.",
+   facts:[...FACTS_STD.slice(0,3), "There is no replica of this server"],
+   opts:[["Restore last night's dump on the new VM","bad","That works, but Coral Bay loses everything since 02:00 when it had a better option."],
+         ["Restore the 02:00 base backup on the new VM and replay all archived WAL to the end, with no recovery target","ok","With no target, recovery replays every archived file. With archive_timeout at 60 seconds, at most about a minute of work is lost."],
+         ["Recover to 14:00 to be safe","bad","Nothing went wrong at 14:00. Stopping early throws away an hour of good work."],
+         ["Wait for Azure to repair the disk","bad","The disk is gone. Waiting only makes the outage longer."]],
+   order:{ prompt:"Put the recovery on the new VM in order.",
+     steps:["Install Docker and pull postgres:18 on the new VM",
+            "Copy the base backup and the WAL archive from off-site storage",
+            "Put the base backup in the new volume as the data directory",
+            "Set restore_command and create recovery.signal",
+            "Start the server and watch the log replay every archived file",
+            "Check row counts, then call pg_wal_replay_resume()"] } },
+ { id:"INC-3104", pri:"p1", title:"Every freight charge is zero",
+   from:"Billing office · 16:24",
+   msg:"All invoices show $0.00. Someone ran <code>UPDATE ops.shipment SET freight_charge = 0</code> without a WHERE at 16:20:13. We stopped all work the moment we saw it. Nothing has been entered since.",
+   facts:FACTS_STD,
+   opts:[["Write an UPDATE that puts the old charges back","bad","The old values are gone from the table. Only a backup or the WAL still has them."],
+         ["Restore the shipment table from last night's dump","bad","Every charge entered today would come back wrong or missing."],
+         ["Run point-in-time recovery on production to 16:20:12","ok","Work stopped at the incident, so nothing good happened after it. Recovering the whole server to one second before the UPDATE loses nothing."],
+         ["Promote the replica","bad","The replica applied the same UPDATE."]] },
+ { id:"INC-3105", pri:"p2", title:"Auditor needs last Friday's numbers",
+   from:"Finance · Wednesday 11:00",
+   msg:"The auditor wants to see the database exactly as it was last Friday at 17:00, when the quarter closed. Please do not change production.",
+   facts:["Today is Wednesday", ...FACTS_STD.slice(0,3)],
+   opts:[["Restore Saturday's 02:00 dump into a new database","bad","Close, but it includes everything entered Friday evening after 17:00, so the numbers will not match the close."],
+         ["Recover a separate copy from Friday's 02:00 base backup to Friday 17:00:00","ok","Base backups and WAL are kept 14 days, so you can rebuild any moment in that window on a copy, without touching production."],
+         ["Run point-in-time recovery on production to Friday 17:00","bad","That would erase five days of production work."],
+         ["Ask the auditor to accept today's data","bad","The audit is about the quarter close, not today."]] },
+ { id:"INC-3106", pri:"p3", title:"Are we safe?",
+   from:"Ana Reyes, IT manager · Friday 08:30",
+   msg:"We have run a nightly dump for a year. Nobody has ever restored one. The board asked me if our backups work. What do I tell them?",
+   facts:["365 dump files, all a similar size","No restore test on record"],
+   opts:[["Yes, the files are there every morning","bad","A file existing proves nothing. A dump can be empty, truncated, or missing a schema, and you only find out during the outage."],
+         ["Schedule a regular restore test into a new database and compare row counts and totals with production","ok","A backup is proven only by restoring it. Make the test routine and write down how long it took: that is your real RTO."],
+         ["Take two dumps a night instead of one","bad","Twice as many untested files is still untested."],
+         ["Rely on the replica instead","bad","A replica copies mistakes instantly. It is not a backup."]] }
+];
+
+/* ---------- state ---------- */
+const st = T.map(()=>({choice:null, tries:0, solved:false, orderTries:0, orderDone:false, perm:null, pts:0}));
+let cur=0, score=0; let t0=Date.now(); const t0r=()=>{ t0=Date.now(); };
+const MAX=18;
+function shuffle(n){ const a=[...Array(n).keys()]; for(let i=n-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} if(a.every((v,i)=>v===i)) a.reverse(); return a; }
+T.forEach((t,i)=>{ if(t.order) st[i].perm = shuffle(t.order.steps.length); });
+
+function add(n){ score+=n; $("score").textContent=score; if(G&&!reduce) G.fromTo("#score",{scale:1.5},{scale:1,duration:.4,ease:"back.out(3)"}); }
+function complete(i){ const t=T[i], s=st[i]; return s.solved && (!t.order || s.orderDone); }
+
+function drawQueue(){
+  $("queue").innerHTML = T.map((t,i)=>`<button type="button" class="qitem ${complete(i)?"done":""}" data-i="${i}" ${i===cur?'aria-current="true"':""}>
+     <span class="id">${t.id}</span><span class="t">${t.title}</span></button>`).join("") +
+     (T.every((_,i)=>complete(i)) ? `<button type="button" class="qitem" data-i="res" ${cur==="res"?'aria-current="true"':""}><span class="id">REPORT</span><span class="t">Your shift report</span></button>`:"");
+  $("queue").querySelectorAll(".qitem").forEach(b=>b.addEventListener("click",()=>{ cur = b.dataset.i==="res"?"res":+b.dataset.i; draw(); }));
+  $("progress").textContent = `${T.filter((_,i)=>complete(i)).length} of 6 tickets solved`;
+}
+
+function draw(){
+  drawQueue();
+  if(cur==="res") return drawResults();
+  const t=T[cur], s=st[cur];
+  const pri = {p1:"Priority 1",p2:"Priority 2",p3:"Priority 3"}[t.pri];
+  let html = `<div class="th"><span class="id">${t.id}</span><span class="pri ${t.pri}">${pri}</span></div><div class="body">
+    <h2>${t.title}</h2><p class="from">${t.from}</p><p class="msg">${t.msg}</p>
+    <div class="facts"><h3>What you have</h3><ul>${t.facts.map(f=>`<li>${f}</li>`).join("")}</ul></div>
+    <div class="q"><h3>How do you get the data back?</h3><div class="opts">${t.opts.map((o,k)=>`<button type="button" class="opt" data-k="${k}"><span class="l">${"ABCD"[k]}</span><span>${o[0]}</span></button>`).join("")}</div><div class="fb" id="fbA"></div></div>`;
+  if(t.order) html += `<div class="q" id="ordQ" ${s.solved?"":"hidden"}><h3>${t.order.prompt}</h3><ol class="order" id="ord"></ol>
+      <div class="btns"><button type="button" class="btn" id="chk">Check the order</button></div><div class="fb" id="fbB"></div></div>`;
+  html += `<div class="btns"><button type="button" class="btn ghost" id="next" ${complete(cur)?"":"hidden"}>Next ticket</button></div></div>`;
+  $("ticket").innerHTML = html;
+  // restore answered state
+  if(s.solved){ markOpts(t, s.choice, true); $("fbA").className="fb ok"; $("fbA").innerHTML = "<b>Correct.</b> "+t.opts[s.choice][2]; }
+  $("ticket").querySelectorAll(".opt").forEach(b=>b.addEventListener("click",()=>choose(+b.dataset.k)));
+  if(t.order){ drawOrder(); $("chk").addEventListener("click",checkOrder); if(s.orderDone){ $("chk").disabled=true; } }
+  $("next").addEventListener("click",()=>{ const nxt=T.findIndex((_,i)=>!complete(i)); cur = nxt===-1 ? "res" : nxt; draw(); });
+  if(G&&!reduce) G.from("#ticket .body > *",{y:10,opacity:0,duration:.35,stagger:.05});
+}
+
+function markOpts(t, k, final){
+  $("ticket").querySelectorAll(".opt").forEach(b=>{ const n=+b.dataset.k; b.classList.remove("ok","bad");
+    if(n===k) b.classList.add(t.opts[n][1]); if(final){ b.disabled=true; if(t.opts[n][1]==="ok") b.classList.add("ok"); } });
+}
+function choose(k){
+  const t=T[cur], s=st[cur]; if(s.solved) return;
+  s.tries++; const ok = t.opts[k][1]==="ok";
+  markOpts(t,k,ok);
+  const fb=$("fbA"); fb.className="fb "+(ok?"ok":"bad");
+  fb.innerHTML = (ok?"<b>Correct.</b> ":"<b>Not this one.</b> ")+t.opts[k][2];
+  if(ok){ s.solved=true; s.choice=k; const p = s.tries===1?2:(s.tries===2?1:0); s.pts+=p; add(p);
+    if(t.order){ $("ordQ").hidden=false; if(G&&!reduce) G.from("#ordQ",{y:14,opacity:0,duration:.4}); }
+    else { $("next").hidden=false; drawQueue(); } }
+}
+
+function drawOrder(){
+  const t=T[cur], s=st[cur];
+  $("ord").innerHTML = s.perm.map((stepIdx,pos)=>`<li data-pos="${pos}"><span class="n">${pos+1}.</span><span>${t.order.steps[stepIdx]}</span>
+     <span class="mv"><button type="button" aria-label="Move up" data-d="-1" ${pos===0||s.orderDone?"disabled":""}>↑</button><button type="button" aria-label="Move down" data-d="1" ${pos===s.perm.length-1||s.orderDone?"disabled":""}>↓</button></span></li>`).join("");
+  $("ord").querySelectorAll(".mv button").forEach(b=>b.addEventListener("click",()=>{
+    const li=b.closest("li"), pos=+li.dataset.pos, d=+b.dataset.d, np=pos+d;
+    [s.perm[pos],s.perm[np]]=[s.perm[np],s.perm[pos]];
+    drawOrder();
+    const moved=$("ord").children[np]; moved.querySelector(`button[data-d="${d}"]`)?.focus() || moved.querySelector("button:not([disabled])")?.focus();
+    if(G&&!reduce) G.from(moved,{y:-d*16,duration:.25,ease:"power2.out"});
+  }));
+  if(s.orderDone) [...$("ord").children].forEach(li=>li.classList.add("ok"));
+}
+function checkOrder(){
+  const t=T[cur], s=st[cur]; if(s.orderDone) return;
+  s.orderTries++;
+  let right=0;
+  [...$("ord").children].forEach((li,pos)=>{ const ok = s.perm[pos]===pos; if(ok) right++; li.classList.remove("ok","bad"); li.classList.add(ok?"ok":"bad"); });
+  const fb=$("fbB");
+  if(right===s.perm.length){
+    s.orderDone=true; const p = s.orderTries===1?3:(s.orderTries===2?2:1); s.pts+=p; add(p);
+    fb.className="fb ok"; fb.innerHTML=`<b>Correct order.</b> ${s.orderTries===1?"First try.":"Solved in "+s.orderTries+" tries."} Notice that the evidence comes first and the irreversible step comes last.`;
+    $("chk").disabled=true; $("next").hidden=false; drawOrder(); drawQueue();
+  } else {
+    fb.className="fb bad"; fb.textContent=`${right} of ${s.perm.length} steps are in the right place (green). Move the red ones and check again.`;
+  }
+}
+
+function drawResults(){
+  const firstTry = st.filter(s=>s.tries===1).length;
+  $("ticket").innerHTML = `<div class="th"><span class="id">SHIFT REPORT</span><span class="pri p3">Closed</span></div><div class="body">
+    <h2>Your shift on the incident desk</h2><p class="from">Take a screenshot of this screen for Assignment 3.1.</p>
+    <div class="final">
+      <div class="stat"><div class="v">${score} / ${MAX}</div><div class="k">Points</div></div>
+      <div class="stat"><div class="v">${firstTry} / 6</div><div class="k">Right method, first try</div></div>
+      <div class="stat"><div class="v">${st.filter(s=>s.orderTries===1).length} / 2</div><div class="k">Step orders, first try</div></div>
+      <div class="stat"><div class="v">${Math.max(1,Math.round((Date.now()-t0)/60000))}</div><div class="k">Minutes on shift</div></div>
+    </div>
+    <ul class="rev">${T.map((t,i)=>`<li class="${st[i].tries===1?"ok":"bad"}">${t.id}: ${t.title}<small>${t.opts.find(o=>o[1]==="ok")[0].replace(/<[^>]+>/g,"")}</small></li>`).join("")}</ul>
+    <div class="btns"><button type="button" class="btn ghost" id="again">Start a new shift</button></div></div>`;
+  $("again").addEventListener("click",()=>{ score=0; t0r(); $("score").textContent=0; st.forEach((s,i)=>{ Object.assign(s,{choice:null,tries:0,solved:false,orderTries:0,orderDone:false,pts:0}); if(T[i].order) s.perm=shuffle(T[i].order.steps.length); }); cur=0; draw(); });
+  if(G&&!reduce) G.from(".rev li",{x:-10,opacity:0,stagger:.05,duration:.3});
+}
+
+draw();
+})();
+</script>
+
+</html>

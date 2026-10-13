@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coral Bay Recovery Timeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: controls on the left, a one-day timeline of work, WAL and events on the right, results strip below */
+:root{
+  --paper:#F7F3EE; --surface:#FFFFFF; --ink:#171310; --muted:#6B5F57; --line:#DED8D2;
+  --maroon:#990000; --accent:#C00000; --soft:#FBF9F7;
+  --work:#C9B8A8; --wal:#8A6F5A; --replay:#1F7A45; --lost:#C7C0BA; --bad:#B42318; --bad-bg:#FDECEA; --ok:#1F7A45; --ok-bg:#E3F3E9; --warn-bg:#FFF4D6;
+  --f-display:'Questrial','Century Gothic',Arial,sans-serif;
+  --f-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --work:#5E4E42; --wal:#B89A80; --replay:#7FD6A0; --lost:#4A413B; --bad:#FF8A80; --bad-bg:#3A1716; --ok:#7FD6A0; --ok-bg:#16301F; --warn-bg:#3A3015; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#161210; --surface:#211B18; --ink:#F1EAE4; --muted:#B5A79D; --line:#3A302B;
+  --maroon:#B01818; --accent:#FF6B6B; --soft:#1B1614;
+  --work:#5E4E42; --wal:#B89A80; --replay:#7FD6A0; --lost:#4A413B; --bad:#FF8A80; --bad-bg:#3A1716; --ok:#7FD6A0; --ok-bg:#16301F; --warn-bg:#3A3015; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-display);font-size:15px;line-height:1.55;margin:0}
+header.top{background:var(--maroon);color:#fff;padding:16px 20px}
+header.top .kicker{font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.9}
+header.top h1{margin:2px 0 0;font-size:24px;font-weight:400;text-wrap:balance}
+header.top p{margin:6px 0 0;font-size:14px;opacity:.92;max-width:76ch}
+.wrap{max-width:1240px;margin:0 auto;padding:18px 16px 40px}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);padding:14px 16px;min-width:0}
+.panel h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:400}
+fieldset{border:0;margin:0 0 16px;padding:0}
+legend{font-size:13px;color:var(--muted);margin-bottom:6px;padding:0}
+.opt{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--line);padding:8px 10px;margin-bottom:6px;cursor:pointer;background:var(--surface)}
+.opt input{accent-color:var(--accent);margin-top:4px}
+.opt small{display:block;color:var(--muted);font-size:12px}
+.opt:has(input:checked){border-color:var(--accent);background:var(--soft)}
+.opt:has(input:disabled){opacity:.45;cursor:not-allowed}
+.slider label{font-size:13px;color:var(--muted)}
+.slider input[type=range]{width:100%;accent-color:var(--accent)}
+.tval{font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.quick button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 10px;font-size:13px}
+.btn.main{background:var(--maroon);border-color:var(--maroon);color:#fff;padding:10px 18px;font-size:15px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tl{overflow-x:auto}
+.tl svg{display:block;min-width:720px;width:100%;height:auto}
+.tl text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+.tl .lab{font-family:var(--f-display);font-size:12px;fill:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:12px;height:12px;vertical-align:-1px;margin-right:5px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border:1px solid var(--line);background:var(--surface);padding:10px 12px}
+.stat .v{font-size:24px;font-variant-numeric:tabular-nums}
+.stat .k{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.chip{display:inline-block;font-size:11px;padding:1px 8px;margin-left:6px;vertical-align:3px;letter-spacing:.04em}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.bad{background:var(--bad-bg);color:var(--bad)}
+.lesson{margin-top:14px;border-left:4px solid var(--accent);background:var(--soft);padding:12px 14px}
+.lesson p{margin:0 0 8px} .lesson p:last-child{margin:0}
+.runrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.status{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+code{font-family:var(--f-mono);font-size:12.5px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top">
+  <div class="kicker">CIT 408 · Module 3 · Activity 3.1</div>
+  <h1>One bad day at Coral Bay</h1>
+  <p>Thursday, October 22, 2026. At 14:32:05 a dispatcher deletes every shipment line. Nobody notices until 15:10. Choose the backup Coral Bay had, choose where to stop, and see exactly what comes back and what is gone.</p>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <aside class="panel" aria-label="Recovery choices">
+      <h2>Your choices</h2>
+      <fieldset>
+        <legend>What went wrong</legend>
+        <label class="opt"><input type="radio" name="event" value="delete" checked><span>Bad DELETE at 14:32:05<small>Human error, noticed at 15:10</small></span></label>
+        <label class="opt"><input type="radio" name="event" value="disk"><span>Disk failure at 15:24:40<small>The server and its pg_wal folder are gone</small></span></label>
+      </fieldset>
+      <fieldset>
+        <legend>Backups Coral Bay had</legend>
+        <label class="opt"><input type="radio" name="strategy" value="dump"><span>Nightly pg_dump at 02:00<small>Copied off the server every morning</small></span></label>
+        <label class="opt"><input type="radio" name="strategy" value="pitr" checked><span>Base backup at 02:00 plus WAL archiving<small>Archive copied off the server as it is written</small></span></label>
+      </fieldset>
+      <fieldset id="toField">
+        <legend><code>archive_timeout</code></legend>
+        <label class="opt"><input type="radio" name="timeout" value="0"><span>Off<small>Archive only when a 16 MB WAL file fills</small></span></label>
+        <label class="opt"><input type="radio" name="timeout" value="5"><span>5 minutes</span></label>
+        <label class="opt"><input type="radio" name="timeout" value="1" checked><span>1 minute</span></label>
+      </fieldset>
+      <div class="slider" id="targetBox">
+        <label for="target">Recovery target (<code>recovery_target_time</code>)</label>
+        <div class="tval" id="tval" aria-live="polite">14:32:04</div>
+        <input type="range" id="target" min="0" max="1" step="1">
+        <div class="quick">
+          <button type="button" id="qBefore">1 s before the DELETE</button>
+          <button type="button" id="qLatest">Latest possible</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel" aria-label="Timeline and results">
+      <h2>Thursday, 00:00 to 18:00</h2>
+      <div class="tl"><svg id="svg" viewBox="0 0 1000 300" role="img" aria-label="Timeline of dispatch work, archived WAL files and events"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--work)"></i>Dispatch transactions per 15 minutes</span>
+        <span><i style="background:var(--wal)"></i>WAL file archived</span>
+        <span><i style="background:var(--replay)"></i>Replayed during recovery</span>
+        <span><i style="background:var(--lost)"></i>Not recovered</span>
+      </div>
+      <div class="runrow">
+        <button class="btn main" type="button" id="run">Run the recovery</button>
+        <span class="status" id="status" aria-live="polite"></span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="v" id="sRec">--</div><div class="k">Recovered to</div></div>
+        <div class="stat"><div class="v" id="sKept">--</div><div class="k">Transactions kept</div></div>
+        <div class="stat"><div class="v" id="sLost">--</div><div class="k">Good transactions lost</div></div>
+        <div class="stat"><div class="v" id="sRpo">--</div><div class="k">Data loss (RPO 5 min)</div></div>
+        <div class="stat"><div class="v" id="sRto">--</div><div class="k">Est. restore time (RTO 60 min)</div></div>
+        <div class="stat"><div class="v" id="sLines">--</div><div class="k">Shipment lines</div></div>
+      </div>
+      <div class="lesson" id="lesson" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+
+/* ---------- the day, minute by minute (deterministic) ---------- */
+const END = 18*60, DELETE_S = (14*60+32)*60+5, NOTICE = 15*60+10, FAIL_M = 15*60+24, FAIL_S = FAIL_M*60 + 40, BASE_END = 2*60+6;
+const rate = m => {
+  const h = m/60;
+  let r = h < 6 ? 5 : h < 8 ? 5 + (h-6)/2*115 : h < 17 ? 120 : 120 - (h-17)*60;
+  return Math.max(4, Math.round(r * (1 + 0.18*Math.sin(m/23) + 0.1*Math.sin(m/7))));
+};
+const perMin = []; for(let m=0;m<END;m++) perMin.push(m <= FAIL_M ? rate(m) : 0);
+const cum = [0]; perMin.forEach(v=>cum.push(cum[cum.length-1]+v));
+const txUpTo = s => { const m=Math.floor(s/60); return cum[Math.min(m,END)] + (m<END ? perMin[m]*((s%60)/60) : 0); };
+const TX_PER_SEG = 2048;               // about 8 kB of WAL per transaction, 16 MB files
+const LINES = 48120;
+
+function segments(timeoutMin, stopMin){
+  // Returns archive times (minutes) of WAL files, up to the moment work stops at 15:10
+  const out=[]; let fill=0, last=0;
+  for(let m=0;m<stopMin;m++){
+    fill += perMin[m];
+    if(fill >= TX_PER_SEG){ out.push(m+1); fill -= TX_PER_SEG; last=m+1; }
+    else if(timeoutMin && fill>0 && (m+1-last) >= timeoutMin){ out.push(m+1); fill=0; last=m+1; }
+  }
+  return out;
+}
+
+/* ---------- drawing ---------- */
+const X0=70, X1=980, x = m => X0 + m/END*(X1-X0);
+const svg = $("svg");
+function el(tag, attrs, parent){ const e=document.createElementNS(NS,tag); for(const k in attrs){ if(k==="fill"||k==="stroke") e.style[k]=attrs[k]; else e.setAttribute(k,attrs[k]); } (parent||svg).appendChild(e); return e; }
+const fill=(e,v)=>{ e.style.fill=v; };
+function fmt(s){ s=Math.round(s); const h=Math.floor(s/3600), mm=Math.floor(s%3600/60), ss=s%60; return [h,mm,ss].map(v=>String(v).padStart(2,"0")).join(":"); }
+
+let tiles=[], bars=[], lostRect, playhead, targetLine, evDel=[], evDisk=[];
+function drawStatic(){
+  svg.innerHTML="";
+  el("text",{x:8,y:70,class:"lab"}).textContent="Work";
+  el("text",{x:8,y:166,class:"lab"}).textContent="WAL";
+  el("text",{x:8,y:212,class:"lab"}).textContent="Events";
+  // hour axis
+  for(let h=0;h<=18;h+=2){ el("line",{x1:x(h*60),x2:x(h*60),y1:30,y2:236,stroke:"var(--line)"}); el("text",{x:x(h*60),y:252,"text-anchor":"middle"}).textContent=String(h).padStart(2,"0")+":00"; }
+  // work bars per 15 min
+  bars=[];
+  const max = Math.max(...Array.from({length:END/15},(_,i)=>perMin.slice(i*15,i*15+15).reduce((a,b)=>a+b,0)));
+  for(let i=0;i<END/15;i++){
+    const v=perMin.slice(i*15,i*15+15).reduce((a,b)=>a+b,0); if(!v) continue;
+    const hgt = v/max*80;
+    bars.push({m0:i*15, r:el("rect",{x:x(i*15)+0.5,y:120-hgt,width:(X1-X0)/(END/15)-1,height:hgt,fill:"var(--work)"})});
+  }
+  lostRect = el("rect",{x:x(0),y:30,width:0,height:206,fill:"var(--lost)",opacity:.45});
+  // events
+  const ev=(m,label,color,dy)=>{ const a=el("line",{x1:x(m),x2:x(m),y1:30,y2:236,stroke:color,"stroke-width":2,"stroke-dasharray":"4 3"}); const b=el("text",{x:x(m)+4,y:206+dy,fill:color}); b.textContent=label; return [a,b]; };
+  ev(BASE_END,"02:00 backup","var(--muted)",0);
+  evDel = [...ev(DELETE_S/60,"14:32:05 DELETE","var(--bad)",0), ...ev(NOTICE,"15:10 noticed","var(--accent)",16)];
+  evDisk = ev(FAIL_S/60,"15:24:40 disk fails","var(--bad)",0);
+  targetLine = el("line",{x1:0,x2:0,y1:26,y2:240,stroke:"var(--replay)","stroke-width":3});
+  playhead = el("circle",{cx:x(BASE_END),cy:166,r:6,fill:"var(--replay)",opacity:0});
+}
+function drawTiles(segs){
+  tiles.forEach(t=>t.r.remove()); tiles=[];
+  segs.forEach(m=>{ tiles.push({m, r:el("rect",{x:x(m)-1,y:154,width:2,height:24,fill:"var(--wal)"})}); });
+  svg.appendChild(targetLine); svg.appendChild(playhead);
+}
+
+/* ---------- state and results ---------- */
+const S = ()=>({
+  event: document.querySelector('input[name=event]:checked').value,
+  strategy: document.querySelector('input[name=strategy]:checked').value,
+  timeout: +document.querySelector('input[name=timeout]:checked').value
+});
+const slider=$("target");
+slider.min = BASE_END*60; slider.max = NOTICE*60; slider.value = DELETE_S-1;
+
+function outcome(){
+  const s=S(), segs=segments(s.timeout, s.event==="disk" ? FAIL_M : NOTICE);
+  let rec, note;
+  if(s.strategy==="dump"){ rec = 2*3600; }
+  else if(s.event==="disk"){ rec = (segs.length? segs[segs.length-1] : 0)*60; }
+  else { rec = +slider.value; }
+  const kept = Math.round(txUpTo(rec));
+  const goodEnd = s.event==="disk" ? FAIL_S : NOTICE*60;
+  const lost = Math.round(txUpTo(goodEnd) - txUpTo(rec));
+  const deleteReplayed = s.event==="delete" && rec >= DELETE_S;
+  const lossMin = (goodEnd - rec)/60;
+  let rto;
+  if(s.strategy==="dump") rto = 28;
+  else { const replayedTx = txUpTo(rec) - txUpTo(BASE_END*60); rto = Math.round(6 + 4 + replayedTx/15000); }   // copy base backup, start, replay about 15,000 transactions a minute
+  return {s,segs,rec,kept,lost,deleteReplayed,lossMin,rto};
+}
+
+function render(){
+  const o=outcome(), s=o.s;
+  evDel.forEach(e=>e.style.display = s.event==="delete"?"":"none"); evDisk.forEach(e=>e.style.display = s.event==="disk"?"":"none");
+  // enable/disable controls
+  document.querySelectorAll('input[name=timeout]').forEach(i=>i.disabled = s.strategy==="dump");
+  const sliderOn = s.strategy==="pitr" && s.event==="delete";
+  slider.disabled = !sliderOn; $("qBefore").disabled=!sliderOn; $("qLatest").disabled=!sliderOn;
+  $("targetBox").style.opacity = sliderOn?1:.5;
+  $("tval").textContent = sliderOn ? fmt(+slider.value) : (s.strategy==="dump" ? "02:00:00 (the dump)" : "end of archived WAL");
+
+  drawTiles(s.strategy==="pitr" ? o.segs : []);
+  tiles.forEach(t=>fill(t.r, t.m*60 <= o.rec ? "var(--wal)" : "var(--lost)"));
+  targetLine.setAttribute("x1",x(o.rec/60)); targetLine.setAttribute("x2",x(o.rec/60));
+  lostRect.setAttribute("x",x(o.rec/60)); lostRect.setAttribute("width",Math.max(0,x((s.event==="disk"?FAIL_S:NOTICE*60)/60)-x(o.rec/60)));
+
+  $("sRec").textContent = fmt(o.rec);
+  $("sKept").textContent = o.kept.toLocaleString();
+  $("sLost").textContent = o.lost.toLocaleString();
+  const rpoOk = o.lossMin <= 5 && !o.deleteReplayed;
+  $("sRpo").innerHTML = (o.lossMin<1? Math.round(o.lossMin*60)+" s" : (o.lossMin<120? o.lossMin.toFixed(1)+" min" : (o.lossMin/60).toFixed(1)+" h")) +
+     `<span class="chip ${rpoOk?"ok":"bad"}">${rpoOk?"meets":"misses"}</span>`;
+  $("sRto").innerHTML = o.rto+" min"+`<span class="chip ${o.rto<=60?"ok":"bad"}">${o.rto<=60?"meets":"misses"}</span>`;
+  $("sLines").innerHTML = (o.deleteReplayed? "0" : LINES.toLocaleString()) + `<span class="chip ${o.deleteReplayed?"bad":"ok"}">${o.deleteReplayed?"deleted again":"intact"}</span>`;
+
+  $("lesson").innerHTML = lesson(o);
+}
+
+function lesson(o){
+  const s=o.s, lostTxt = o.lost.toLocaleString();
+  if(s.strategy==="dump"){
+    return `<p><b>The dump is all you have.</b> Coral Bay goes back to 02:00 and loses ${lostTxt} transactions, every dispatch entered today. A logical dump can only restore the moment it was taken.</p>
+            <p>Restoring just the shipment line table from the dump would save the other tables, but that table would still lose everything since 02:00.</p>`;
+  }
+  if(s.event==="disk"){
+    const gap = o.lossMin;
+    return `<p><b>Replay stops at the last archived WAL file.</b> The disk took the current, half-filled WAL file with it, so ${gap<1?Math.round(gap*60)+" seconds":gap.toFixed(1)+" minutes"} of work (${lostTxt} transactions) is gone.</p>
+            <p>${s.timeout? `With <code>archive_timeout = ${s.timeout}</code>, a file is archived at least every ${s.timeout} minute${s.timeout>1?"s":""}, so the loss can never be longer than that.` : `With <code>archive_timeout</code> off, a file is archived only when it fills 16 MB. Try 1 minute and compare the loss.`}</p>`;
+  }
+  if(o.deleteReplayed){
+    return `<p><b>You replayed the DELETE.</b> Your target is at or after 14:32:05, so recovery applied the bad transaction again and every shipment line is gone. Move the target to before the commit.</p>
+            <p>This is why you find the exact commit time first, with the server log or <code>pg_waldump</code>, before you restore.</p>`;
+  }
+  const before = (DELETE_S - o.rec);
+  if(before <= 60){
+    return `<p><b>You stopped ${before} second${before===1?"":"s"} before the DELETE.</b> Every shipment line is back and only ${lostTxt} good transactions are lost: the work done between 14:32 and 15:10.</p>
+            <p>Those transactions are not in any backup. The business re-enters them from the evidence you saved before restoring. Point-in-time recovery cannot keep work that came after your target.</p>`;
+  }
+  return `<p><b>The DELETE is undone, but you stopped early.</b> You recovered to ${fmt(o.rec)}, so ${lostTxt} good transactions are lost, ${Math.round((DELETE_S-o.rec)/60)} minutes more than needed. Try the "1 s before" button.</p>`;
+}
+
+/* ---------- the replay animation ---------- */
+let anim=null;
+function run(){
+  const o=outcome();
+  if(anim) anim.kill();
+  const st=$("status");
+  if(reduce || !G){ render(); st.textContent = "Recovered to "+fmt(o.rec)+"."; return; }
+  render();
+  const startM = o.s.strategy==="dump" ? 0 : BASE_END;
+  const endM = o.rec/60;
+  const proxy={m:startM};
+  tiles.forEach(t=>fill(t.r, t.m*60 <= o.rec ? "var(--wal)" : "var(--lost)"));
+  playhead.setAttribute("opacity",1);
+  st.textContent = o.s.strategy==="dump" ? "pg_restore: rebuilding tables from the 02:00 dump" : "Copying base backup, then replaying archived WAL";
+  anim = G.timeline()
+    .to(proxy,{m:endM,duration:o.s.strategy==="dump"?1.2:3,ease:"none",onUpdate:()=>{
+      playhead.setAttribute("cx",x(proxy.m));
+      tiles.forEach(t=>{ if(t.m<=proxy.m && t.m*60<=o.rec && t.m>BASE_END) fill(t.r,"var(--replay)"); });
+      $("sKept").textContent = Math.round(txUpTo(proxy.m*60)).toLocaleString();
+    }})
+    .call(()=>{ st.textContent = o.s.strategy==="dump" ? "Restore finished at the 02:00 state" : (o.s.event==="disk" ? "Reached the end of the archived WAL" : "recovery stopping before "+fmt(o.rec+1)+", pausing at the end of recovery"); render(); playhead.setAttribute("opacity",0); })
+    .from("#lesson",{opacity:0,y:8,duration:.4});
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll('input[type=radio]').forEach(i=>i.addEventListener("change",render));
+slider.addEventListener("input",render);
+$("qBefore").addEventListener("click",()=>{ slider.value=DELETE_S-1; render(); });
+$("qLatest").addEventListener("click",()=>{ slider.value=NOTICE*60; render(); });
+$("run").addEventListener("click",run);
+drawStatic(); render();
+})();
+</script>
+
+</html>
